@@ -21,6 +21,8 @@ package main // import "github.com/minio/minio"
 
 import (
 	"os"
+	"os/signal"
+	"syscall"
 
 	// MUST be first import.
 	_ "github.com/minio/minio/internal/init"
@@ -29,5 +31,18 @@ import (
 )
 
 func main() {
-	minio.Main(os.Args)
+	ctx, cancel := minio.MainWithShutdown(os.Args)
+	defer cancel()
+
+	// Handle shutdown signals
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case <-ctx.Done():
+		// Server stopped
+	case <-sigCh:
+		// External shutdown signal
+		cancel()
+	}
 }

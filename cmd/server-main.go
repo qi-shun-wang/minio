@@ -741,6 +741,9 @@ func initializeLogRotate(ctx *cli.Context) (io.WriteCloser, error) {
 	logger.EnableJSON()
 	return output, nil
 }
+func ServerMain(ctx *cli.Context) {
+	serverMain(ctx)
+}
 
 // serverMain handler called for 'minio server' command.
 func serverMain(ctx *cli.Context) {

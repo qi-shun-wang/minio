@@ -18,6 +18,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -199,16 +200,20 @@ var debugNoExit = env.Get("_MINIO_DEBUG_NO_EXIT", "") != ""
 
 // Main main for minio server.
 func Main(args []string) {
-	// Set the minio app name.
+	_, cancel := MainWithShutdown(args)
+	defer cancel()
+	select {} // Block forever
+}
+
+// MainWithShutdown starts minio server and returns a shutdown function.
+func MainWithShutdown(args []string) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
 	appName := filepath.Base(args[0])
 
 	if debugNoExit {
 		freeze := func(_ int) {
-			// Infinite blocking op
-			<-make(chan struct{})
+			cancel()
 		}
-
-		// Override the logger os.Exit()
 		logger.ExitFunc = freeze
 
 		defer func() {
@@ -217,12 +222,15 @@ func Main(args []string) {
 				fmt.Println("")
 				fmt.Println(string(debug.Stack()))
 			}
-			freeze(-1)
+			cancel()
 		}()
 	}
 
-	// Run the app - exit on error.
-	if err := newApp(appName).Run(args); err != nil {
-		os.Exit(1) //nolint:gocritic
-	}
+	go func() {
+		if err := newApp(appName).Run(args); err != nil {
+			cancel()
+		}
+	}()
+
+	return ctx, cancel
 }
